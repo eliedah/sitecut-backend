@@ -14,6 +14,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
 COPY . .
+RUN chmod +x scripts/*.sh test/*.sh
 
 EXPOSE 8080
 CMD ["node", "src/server.js"]
