@@ -1,0 +1,24 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    volumes:
+      - cache:/app/.cache
+      - data:/app/data                         # keeps name/email signups across restarts
+      - ${HOME}/.cdsapirc:/root/.cdsapirc:ro   # only needed if ENABLE_CDS=1
+    expose: ["8080"]
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    depends_on: [api]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    restart: unless-stopped
+
+volumes:
+  cache: {}
+  data: {}
+  caddy_data: {}
