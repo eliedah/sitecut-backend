@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sitecut · Photoreal 3D City</title>
+<script>
+  // Cesium's asset base (models, workers, widgets)
+  window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/';
+</script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Cesium.js"></script>
+<style>
+  html,body,#cesiumContainer{width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#0c141f;
+    font-family:'Space Grotesk',system-ui,sans-serif}
+  #bar{position:absolute;top:12px;left:12px;z-index:10;display:flex;gap:8px;align-items:center;
+    background:rgba(12,20,31,.85);backdrop-filter:blur(6px);border:1px solid #223;border-radius:10px;
+    padding:8px 12px;color:#eef3f8;font-size:13px}
+  #bar b{color:#ff7a45}
+  #bar button{background:#1a2634;border:1px solid #2c3a4c;color:#eef3f8;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
+  #bar button:hover{border-color:#ff7a45}
+  #msg{position:absolute;inset:0;display:grid;place-items:center;z-index:20;color:#eef3f8;
+    background:rgba(6,11,18,.9);text-align:center;padding:24px;font-size:15px;line-height:1.5}
+  #msg.hide{display:none}
+  #msg code{background:#1a2634;padding:2px 6px;border-radius:5px;color:#ffd166}
+  a{color:#ff9a6b}
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+<div id="bar">
+  <span><b>Sitecut</b> · Photoreal city</span>
+  <button id="reset">Recenter</button>
+  <button id="settoken" title="Change Cesium ion token">Token</button>
+  <span id="loc" style="color:#9fb0c0"></span>
+</div>
+<div id="msg">Loading photorealistic 3D tiles…</div>
+
+<script>
+(async function(){
+  // ============================================================
+  //  Cesium ion token. Two ways to set it:
+  //   1) EASIEST: leave this blank and paste your token into the box on the page (remembered
+  //      in your browser). Regenerate it at cesium.com/ion/tokens if it was ever shared.
+  //   2) Or hardcode it here (note: it becomes public in the deployed file).
+  //  Your ion account must have "Google Photorealistic 3D Tiles" added (cesium.com/ion Asset Depot).
+  // ============================================================
+  const HARDCODED_TOKEN = '';
+
+  const msg = document.getElementById('msg');
+  let token = HARDCODED_TOKEN;
+  try{ token = token || localStorage.getItem('cesium_token') || ''; }catch(_){}
+
+  function askToken(){
+    const t = window.prompt('Paste your Cesium ion access token (from cesium.com/ion/tokens):', token || '');
+    if(t && t.trim()){ token = t.trim(); try{ localStorage.setItem('cesium_token', token); }catch(_){} location.reload(); }
+  }
+  document.getElementById('settoken').addEventListener('click', askToken);
+
+  if(!token){
+    msg.innerHTML = 'Enter your Cesium ion token to load the 3D city.<br><br>'
+      + '<button onclick="(function(){var t=prompt(\'Paste your Cesium ion token:\');'
+      + 'if(t){try{localStorage.setItem(\'cesium_token\',t.trim());}catch(e){}location.reload();}})()" '
+      + 'style="background:#ff7a45;border:none;color:#1a0c04;font-weight:600;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:14px">Enter token</button>'
+      + '<br><br><small style="color:#9fb0c0">Get one free at <a href="https://cesium.com/ion/tokens" target="_blank">cesium.com/ion/tokens</a>. '
+      + 'Your account needs "Google Photorealistic 3D Tiles" added in the Asset Depot.</small>';
+    return;
+  }
+
+  // site location from URL (?lat=&lon=) or bbox (?s&w&n&e); default = Seoul / Yeouido
+  const q = new URLSearchParams(location.search);
+  let lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
+  if(isNaN(lat) || isNaN(lon)){
+    const s=parseFloat(q.get('s')), w=parseFloat(q.get('w')), n=parseFloat(q.get('n')), e=parseFloat(q.get('e'));
+    if(!isNaN(s)&&!isNaN(w)&&!isNaN(n)&&!isNaN(e)){ lat=(s+n)/2; lon=(w+e)/2; }
+  }
+  if(isNaN(lat) || isNaN(lon)){ lat=37.5323; lon=126.9145; } // Seoul, Yeouido
+  document.getElementById('loc').textContent = lat.toFixed(4)+', '+lon.toFixed(4);
+
+  Cesium.Ion.defaultAccessToken = token;
+  Cesium.RequestScheduler.requestsByServer['tile.googleapis.com:443'] = 18;
+
+  let viewer;
+  try{
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      globe: false, baseLayerPicker: false, geocoder: false, homeButton: false,
+      sceneModePicker: false, navigationHelpButton: false, animation: false,
+      timeline: false, infoBox: false, selectionIndicator: false,
+      requestRenderMode: true, skyAtmosphere: new Cesium.SkyAtmosphere()
+    });
+    viewer.scene.skyAtmosphere.show = true;
+  }catch(err){
+    msg.innerHTML = 'Could not start the 3D viewer.<br><br>'+err;
+    return;
+  }
+
+  function flyToSite(){
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat - 0.006, 550),
+      orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-28), roll: 0 },
+      duration: 2.2
+    });
+  }
+
+  try{
+    const tileset = await Cesium.createGooglePhotorealistic3DTileset();
+    viewer.scene.primitives.add(tileset);
+    msg.classList.add('hide');
+    flyToSite();
+  }catch(err){
+    msg.innerHTML = 'Loaded the viewer, but couldn\'t load Google Photorealistic 3D Tiles.<br><br>'
+      + 'Make sure your Cesium ion account has <b>Google Photorealistic 3D Tiles</b> added '
+      + '(cesium.com/ion → Asset Depot → add it), then reload.<br><br><small>'+err+'</small>';
+  }
+
+  document.getElementById('reset').addEventListener('click', flyToSite);
+})();
+</script>
+</body>
+</html>

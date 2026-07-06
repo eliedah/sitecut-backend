@@ -1,9 +1,0 @@
-# Replace with your real domain (also register this domain with VWorld and ArcGIS).
-your-domain.example {
-	reverse_proxy api:8080
-}
-
-# For local testing without a domain, comment the block above and use:
-# :80 {
-# 	reverse_proxy api:8080
-# }
