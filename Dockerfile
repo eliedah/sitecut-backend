@@ -2,7 +2,7 @@ FROM ghcr.io/osgeo/gdal:ubuntu-small-latest
 
 # Node 20, DuckDB CLI, Python climate deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates unzip python3-pip \
+      curl ca-certificates unzip python3-pip pdal \
  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get install -y nodejs \
  && pip3 install --break-system-packages cdsapi xarray netcdf4 \
@@ -14,7 +14,6 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
 COPY . .
-RUN chmod +x scripts/*.sh test/*.sh
 
 EXPOSE 8080
 CMD ["node", "src/server.js"]
